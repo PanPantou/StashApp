@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		1A8F82E02E3A69500035D17B /* StashApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StashApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A8F82E02E3A69500035D17B /* StashApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = StashApp.app; path = "/Users/panagiotis/Desktop/StashApp/StashApp/build/Debug-iphoneos/StashApp.app"; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,16 +33,7 @@
 			isa = PBXGroup;
 			children = (
 				1A8F82E22E3A69500035D17B /* StashApp */,
-				1A8F82E12E3A69500035D17B /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		1A8F82E12E3A69500035D17B /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				1A8F82E02E3A69500035D17B /* StashApp.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -95,7 +86,7 @@
 			mainGroup = 1A8F82D72E3A69500035D17B;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 1A8F82E12E3A69500035D17B /* Products */;
+			productRefGroup = 1A8F82D72E3A69500035D17B;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (

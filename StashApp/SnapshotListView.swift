@@ -1,11 +1,11 @@
 import SwiftUI
 import Charts
 
-struct MonthlyCategoryTotal: Identifiable {
-    var id = UUID()
-    let month: String
+struct SnapshotCategoryPoint: Identifiable, Equatable {
+    let id = UUID()
+    let date: Date
     let category: String
-    let total: Double
+    let amount: Double
 }
 
 struct SnapshotListView: View {
@@ -15,81 +15,133 @@ struct SnapshotListView: View {
     @State private var showingErrorAlert = false
     @State private var errorAlertMessage = ""
 
-    // New state variables for delete confirmation
+    // State variables for delete confirmation
     @State private var showingDeleteConfirmation = false
     @State private var snapshotsToDelete: IndexSet?
 
-    var monthlyTotals: [MonthlyCategoryTotal] {
-        let sortedSnapshots = storage.snapshots.sorted(by: { $0.date < $1.date })
-        
-        if sortedSnapshots.isEmpty {
-            return [MonthlyCategoryTotal(month: "No Data", category: "No Data", total: 0)]
-        }
-        
-        // Grouping by a sortable date string (YYYY-MM)
-        let groupedByMonth = Dictionary(grouping: sortedSnapshots) { snapshot in
-            snapshot.date.formatted(Date.FormatStyle().year(.defaultDigits).month(.twoDigits))
-        }
-        
-        var totals: [MonthlyCategoryTotal] = []
-        
-        for (monthString, snapshotsInMonth) in groupedByMonth {
-            let combinedAccounts = snapshotsInMonth.flatMap { $0.accounts }
-            
-            // Calculate total for each category
-            let groupedByCategory = Dictionary(grouping: combinedAccounts) { account in
-                account.category.rawValue
-            }
-            
-            for (category, accountsInCategory) in groupedByCategory {
-                let totalAmount = accountsInCategory.reduce(0) { $0 + $1.amount }
-                totals.append(MonthlyCategoryTotal(month: monthString, category: category, total: totalAmount))
-            }
+    // State for chart interactivity
+    @State private var showOverallTotal = true
+    @State private var selectedDate: Date?
+    @State private var selectedCategoryValues: [String: Double] = [:]
 
-            // Calculate overall monthly total and add it as a separate line
-            let monthlyTotalAmount = combinedAccounts.reduce(0) { $0 + $1.amount }
-            totals.append(MonthlyCategoryTotal(month: monthString, category: "Overall Total", total: monthlyTotalAmount))
+    var snapshotDataPoints: [SnapshotCategoryPoint] {
+        var activeCategories = Set<Snapshot.AccountCategory>()
+        var points = [SnapshotCategoryPoint]()
+        
+        let sortedSnapshots = storage.snapshots.sorted(by: { $0.date < $1.date })
+
+        for snapshot in sortedSnapshots {
+            let categoriesInThisSnapshot = Set(snapshot.accounts.map { $0.category })
+            activeCategories.formUnion(categoriesInThisSnapshot)
+
+            for category in activeCategories {
+                let totalForCategory = snapshot.accounts
+                    .filter { $0.category == category }
+                    .reduce(0) { $0 + $1.amount }
+                points.append(SnapshotCategoryPoint(date: snapshot.date, category: category.rawValue, amount: totalForCategory))
+            }
+            
+            if showOverallTotal {
+                points.append(SnapshotCategoryPoint(date: snapshot.date, category: "Overall Total", amount: snapshot.total))
+            }
         }
         
-        // Sort by month string (now YYYY-MM), then by category
-        return totals.sorted { (item1, item2) in
-            if item1.month != item2.month {
-                return item1.month < item2.month
-            }
-            return item1.category < item2.category
+        return points
+    }
+    
+    // Custom color for each category
+    func colorForCategory(_ category: String) -> Color {
+        switch category {
+        case "Savings": return .green
+        case "Stocks & Shares": return .orange
+        case "Crypto": return .purple
+        case "Current Account": return .red
+        case "Overall Total": return .blue
+        default: return .gray
         }
     }
 
     var body: some View {
         NavigationView {
             VStack {
-                Chart(monthlyTotals) { item in
-                    LineMark(
-                        x: .value("Month", item.month),
-                        y: .value("Total", item.total),
-                        series: .value("Category", item.category)
-                    )
-                    .symbol(by: .value("Category", item.category))
-                    .foregroundStyle(by: .value("Category", item.category))
-                }
-                .chartXAxis {
-                    AxisMarks(preset: .automatic) { value in
-                        AxisValueLabel()
-                        AxisGridLine()
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading) { value in
-                        AxisValueLabel {
-                            if let doubleValue = value.as(Double.self) {
-                                Text(formattedValue(doubleValue))
-                            }
+                VStack {
+                    Chart(snapshotDataPoints) { item in
+                        LineMark(
+                            x: .value("Date", item.date),
+                            y: .value("Amount", item.amount),
+                            series: .value("Category", item.category)
+                        )
+                        .foregroundStyle(colorForCategory(item.category))
+                        .symbol(by: .value("Category", item.category))
+                        
+                        if let selectedDate, Calendar.current.isDate(selectedDate, inSameDayAs: item.date) {
+                            RuleMark(x: .value("Selected Date", selectedDate))
+                                .foregroundStyle(Color.gray.opacity(0.5))
+                                .zIndex(-1)
+                                .annotation(position: .top, alignment: .center) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(selectedDate, style: .date)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                        ForEach(selectedCategoryValues.sorted(by: { $0.key < $1.key }), id: \.key) { category, value in
+                                            HStack {
+                                                Circle()
+                                                    .fill(colorForCategory(category))
+                                                    .frame(width: 8, height: 8)
+                                                Text("\(category): \(formattedValue(value))")
+                                                    .font(.caption)
+                                            }
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(Color(.systemBackground).opacity(0.8))
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                                }
                         }
-                        AxisGridLine()
                     }
+                    .chartXAxis {
+                        AxisMarks(preset: .automatic, values: .stride(by: .month)) { value in
+                            AxisValueLabel(format: .dateTime.month(.abbreviated))
+                            AxisGridLine()
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading) { value in
+                            AxisValueLabel {
+                                if let doubleValue = value.as(Double.self) {
+                                    Text(formattedValue(doubleValue))
+                                }
+                            }
+                            AxisGridLine()
+                        }
+                    }
+                    .chartOverlay { proxy in
+                        GeometryReader { geometry in
+                            Rectangle().fill(.clear).contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            let location = value.location
+                                            if let date: Date = proxy.value(atX: location.x) {
+                                                updateSelection(for: date)
+                                            }
+                                        }
+                                        .onEnded { _ in
+                                            selectedDate = nil
+                                        }
+                                )
+                        }
+                    }
+                    .frame(height: 200)
+                    .padding(.horizontal)
+                    
+                    Toggle(isOn: $showOverallTotal.animation()) {
+                        Text("Show Overall Total")
+                    }
+                    .padding(.horizontal)
                 }
-                .frame(height: 200)
-                .padding()
+                .padding(.vertical)
                 
                 let sortedSnapshots = storage.snapshots.sorted(by: { $0.date < $1.date })
 
@@ -98,7 +150,7 @@ struct SnapshotListView: View {
                     Text("Swipe left to delete a snapshot, or swipe right to edit it.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .listRowSeparator(.hidden) // Hide separator for this text
+                        .listRowSeparator(.hidden)
 
                     ForEach(sortedSnapshots, id: \.id) { snapshot in
                         VStack(alignment: .leading) {
@@ -128,31 +180,41 @@ struct SnapshotListView: View {
                             }
                         }
                         .contentShape(Rectangle())
-                        .swipeActions(edge: .leading) { // Swipe right for edit
+                        .swipeActions(edge: .leading) {
                             Button {
-                                selectedSnapshot = snapshot // Set selectedSnapshot to trigger sheet
+                                selectedSnapshot = snapshot
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
                             .tint(.blue)
                         }
                     }
-                    // Modified onDelete to show confirmation alert
                     .onDelete { offsets in
                         snapshotsToDelete = offsets
                         showingDeleteConfirmation = true
                     }
                 }
-                // Confirmation alert for deletion
                 .alert("Delete Snapshot?", isPresented: $showingDeleteConfirmation) {
                     Button("Delete", role: .destructive) {
                         if let offsets = snapshotsToDelete {
-                            storage.delete(at: offsets)
+                            let sortedSnapshots = storage.snapshots.sorted(by: { $0.date < $1.date })
+                            let snapshotsToDeleteFromView = offsets.map { sortedSnapshots[$0] }
+                            
+                            var indicesToDeleteInStorage = IndexSet()
+                            for snapshot in snapshotsToDeleteFromView {
+                                if let index = storage.snapshots.firstIndex(where: { $0.id == snapshot.id }) {
+                                    indicesToDeleteInStorage.insert(index)
+                                 }
+                            }
+                            
+                            if !indicesToDeleteInStorage.isEmpty {
+                                storage.delete(at: indicesToDeleteInStorage)
+                            }
                         }
-                        snapshotsToDelete = nil // Clear the stored offsets
+                        snapshotsToDelete = nil
                     }
                     Button("Cancel", role: .cancel) {
-                        snapshotsToDelete = nil // Clear the stored offsets
+                        snapshotsToDelete = nil
                     }
                 } message: {
                     Text("Are you sure you want to delete this snapshot? This action cannot be undone.")
@@ -185,7 +247,6 @@ struct SnapshotListView: View {
             .sheet(item: $selectedSnapshot) { snapshot in
                 EditSnapshotView(storage: storage, snapshot: snapshot)
             }
-            // Error alert
             .alert("Error", isPresented: $showingErrorAlert) {
                 Button("OK") { }
             } message: {
@@ -200,7 +261,31 @@ struct SnapshotListView: View {
         }
     }
 
-    // MARK: - Formatting Helpers
+    private func updateSelection(for date: Date) {
+        // Find the closest snapshot date to the dragged date
+        let closestSnapshot = storage.snapshots.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
+        
+        guard let snapshot = closestSnapshot else { return }
+        
+        self.selectedDate = snapshot.date
+        
+        var values: [String: Double] = [:]
+        
+        let activeCategories = Set(snapshotDataPoints.map { $0.category })
+        
+        for category in activeCategories where category != "Overall Total" {
+            let totalForCategory = snapshot.accounts
+                .filter { $0.category.rawValue == category }
+                .reduce(0) { $0 + $1.amount }
+            values[category] = totalForCategory
+        }
+
+        if showOverallTotal {
+            values["Overall Total"] = snapshot.total
+        }
+        
+        self.selectedCategoryValues = values
+    }
 
     func formattedValue(_ value: Double) -> String {
         let formatter = NumberFormatter()

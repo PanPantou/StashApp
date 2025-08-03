@@ -29,6 +29,11 @@ struct SettingsView: View {
                     }
                 }
 
+                // Import from CSV
+                Section(header: Text("Data Management")) {
+                    CSVImporterView(storage: storage)
+                }
+
                 // Buy Me a Coffee Section
                 Section {
                     Text("Hey! If you’re vibin’ with Stash App and it’s helping you boss up your savings, feel free to buy me a coffee ☕️ — totally chill if not, no perks unlocked or anything. Thanks a ton for the support!")

@@ -46,6 +46,11 @@ class SnapshotStorage: ObservableObject {
         save()
     }
 
+    func add(snapshots: [Snapshot]) {
+        self.snapshots.append(contentsOf: snapshots)
+        save()
+    }
+
     func delete(at offsets: IndexSet) {
         snapshots.remove(atOffsets: offsets)
         save()
