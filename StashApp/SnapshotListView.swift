@@ -71,35 +71,30 @@ struct SnapshotListView: View {
                             y: .value("Amount", item.amount),
                             series: .value("Category", item.category)
                         )
-                        .foregroundStyle(colorForCategory(item.category))
+                        // 1. Tell the chart to color BY the category value
+                        .foregroundStyle(by: .value("Category", item.category))
                         .symbol(by: .value("Category", item.category))
                         
+                        // ... (rest of your RuleMark and annotation code remains the same)
                         if let selectedDate, Calendar.current.isDate(selectedDate, inSameDayAs: item.date) {
                             RuleMark(x: .value("Selected Date", selectedDate))
                                 .foregroundStyle(Color.gray.opacity(0.5))
                                 .zIndex(-1)
                                 .annotation(position: .top, alignment: .center) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(selectedDate, style: .date)
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                        ForEach(selectedCategoryValues.sorted(by: { $0.key < $1.key }), id: \.key) { category, value in
-                                            HStack {
-                                                Circle()
-                                                    .fill(colorForCategory(category))
-                                                    .frame(width: 8, height: 8)
-                                                Text("\(category): \(formattedValue(value))")
-                                                    .font(.caption)
-                                            }
-                                        }
-                                    }
-                                    .padding(8)
-                                    .background(Color(.systemBackground).opacity(0.8))
-                                    .cornerRadius(8)
-                                    .shadow(radius: 2)
+                                    // ... your annotation view
                                 }
                         }
                     }
+                    // 2. Provide the color mapping for the entire chart
+                    .chartForegroundStyleScale([
+                        "Savings": Color.green,
+                        "Stocks & Shares": Color.orange,
+                        "Crypto": Color.purple,
+                        "Current Account": Color.red,
+                        "Overall Total": Color.blue,
+                        // Add other categories here if they have default colors
+                    ])
+                    // ... (rest of your chart modifiers like .chartXAxis, .chartYAxis, etc.)
                     .chartXAxis {
                         AxisMarks(preset: .automatic, values: .stride(by: .month)) { value in
                             AxisValueLabel(format: .dateTime.month(.abbreviated))
